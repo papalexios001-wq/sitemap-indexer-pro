@@ -135,7 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, chartData }) => {
                     itemStyle={{ color: '#e4e4e7', fontSize: '12px' }}
                   />
                   <Bar dataKey="health" radius={[4, 4, 0, 0]}>
-                    {projects.map((entry, index) => (
+                    {projects.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#10b981' : '#059669'} />
                     ))}
                   </Bar>

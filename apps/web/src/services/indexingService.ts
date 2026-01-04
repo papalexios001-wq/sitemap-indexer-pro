@@ -16,7 +16,7 @@ function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
 
 function strToBase64Url(str: string): string {
   const encoder = new TextEncoder();
-  return arrayBufferToBase64Url(encoder.encode(str));
+  return arrayBufferToBase64Url(encoder.encode(str).buffer);
 }
 
 function pemToBinary(pem: string): ArrayBuffer {

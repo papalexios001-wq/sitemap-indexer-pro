@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Terminal, Plus, Activity, Boxes, Database, ShieldCheck, ChevronRight, Command, Play, Pause, Square, Download } from 'lucide-react';
 import { Project, LogEntry, JobStatus } from './types';
@@ -34,6 +34,7 @@ const NavItem = ({ to, icon: Icon, label }: { to: string; icon: any; label: stri
 };
 
 export default function App() {
+  // PERSISTENCE: Initialize projects from localStorage
   const [projects, setProjects] = useState<Project[]>(() => {
     try {
       const saved = localStorage.getItem('indexer_projects');
@@ -41,6 +42,7 @@ export default function App() {
     } catch (e) { return []; }
   });
 
+  // Persist whenever projects change
   useEffect(() => {
     localStorage.setItem('indexer_projects', JSON.stringify(projects));
   }, [projects]);
@@ -50,9 +52,11 @@ export default function App() {
   const [isJobRunning, setIsJobRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   
+  // Job Control Refs
   const abortControllerRef = useRef<AbortController | null>(null);
   const pauseSignalRef = useRef<{ paused: boolean }>({ paused: false });
 
+  // Real-time chart data (starts empty)
   const [chartData, setChartData] = useState<any[]>([
      { name: 'Start', value: 0, secondary: 0 }
   ]);
@@ -60,7 +64,8 @@ export default function App() {
   const logsRef = useRef<LogEntry[]>([]);
 
   const addLog = useCallback((log: LogEntry) => {
-    const newLog = { ...log, timestamp: new Date(log.timestamp) };
+    // Keep logs manageable in memory
+    const newLog = { ...log, timestamp: new Date(log.timestamp) }; // Ensure date object
     logsRef.current = [...logsRef.current.slice(-999), newLog];
     setLogs(prev => [...prev.slice(-999), newLog]);
   }, []);
@@ -90,10 +95,11 @@ export default function App() {
               name: timeLabel, 
               value: (last?.value || 0) + submitted,
               secondary: (last?.secondary || 0) + successful
-          }].slice(-30);
+          }].slice(-30); // Keep last 30 points
       });
   };
 
+  // JOB CONTROL: PAUSE UTILITY
   const checkPaused = async () => {
     while (pauseSignalRef.current.paused) {
       if (abortControllerRef.current?.signal.aborted) throw new DOMException('Job Aborted', 'AbortError');
@@ -139,6 +145,7 @@ export default function App() {
     const project = projectOverride || projects.find(p => p.id === projectId);
     if (!project) return;
     
+    // Reset state
     setIsJobRunning(true);
     setIsPaused(false);
     pauseSignalRef.current.paused = false;
@@ -152,15 +159,16 @@ export default function App() {
 
     addLog({ id: 'init', timestamp: new Date(), level: 'info', message: `🚀 STARTING JOB: ${project.domain}`, module: 'WORKER' });
 
-    const streamer = new SitemapStreamer(addLog, (count: number) => updateProjectStats(projectId, { totalUrls: count }), signal);
+    const streamer = new SitemapStreamer(addLog, (count) => updateProjectStats(projectId, { totalUrls: count }), signal);
     const indexer = new IndexingService(addLog);
     
     try {
+      // 1. DISCOVERY
       addLog({ id: `conn`, timestamp: new Date(), level: 'info', message: `Connecting to ${project.sitemapIndexUrl}...`, module: 'STREAM' });
       
       const urls = await streamer.streamParse(project.sitemapIndexUrl);
       
-      await checkPaused();
+      await checkPaused(); // Check pause after discovery
 
       if (urls.length === 0) {
           throw new Error("No URLs found. Check sitemap accessibility.");
@@ -168,6 +176,7 @@ export default function App() {
 
       addLog({ id: 'found', timestamp: new Date(), level: 'success', message: `✔ Discovered ${urls.length} URLs.`, module: 'WORKER' });
 
+      // 2. AUTHENTICATION
       let googleAccessToken = '';
       const hasGoogle = !!(project as any).serviceAccountJson;
       const hasIndexNow = !!project.indexNowKey;
@@ -184,6 +193,7 @@ export default function App() {
 
       const allLocs = urls.map(u => u.loc);
 
+      // 3. PHASE A: INDEXNOW
       if (hasIndexNow && project.indexNowKey) {
           addLog({ id: 'idx_start', timestamp: new Date(), level: 'info', message: '>>> PHASE A: IndexNow Submission', module: 'API' });
           
@@ -210,6 +220,7 @@ export default function App() {
           }
       }
 
+      // 4. PHASE B: GOOGLE
       if (googleAccessToken) {
           addLog({ id: 'goog_start', timestamp: new Date(), level: 'info', message: '>>> PHASE B: Google API', module: 'API' });
           
@@ -293,6 +304,7 @@ export default function App() {
   return (
     <Router>
       <div className="flex h-screen bg-background text-zinc-200 font-sans overflow-hidden">
+        {/* Sidebar */}
         <aside className="w-[280px] border-r border-border bg-surface flex flex-col z-20 shadow-2xl">
           <div className="p-6 pb-2">
             <div className="flex items-center gap-3 mb-6">
@@ -362,9 +374,11 @@ export default function App() {
           </div>
         </aside>
 
+        {/* Main Content */}
         <main className="flex-1 flex flex-col relative overflow-hidden bg-background">
            <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-brand-900/10 rounded-full blur-[128px] pointer-events-none" />
           
+          {/* Header */}
           <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-6 z-10">
             <div className="flex items-center gap-2 text-sm text-zinc-500">
               <span className="hover:text-zinc-300 cursor-pointer">Platform</span>
@@ -408,6 +422,7 @@ export default function App() {
                                <Terminal className="w-4 h-4 text-brand-400" /> Operation Control
                              </h3>
                              
+                             {/* GLOBAL CONTROLS */}
                              {isJobRunning && (
                                <div className="mb-4 p-3 bg-zinc-900 rounded-lg border border-zinc-800 flex gap-2">
                                   <button onClick={togglePause} className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 py-2 rounded text-xs font-medium border border-zinc-700 transition-colors">
@@ -457,7 +472,7 @@ export default function App() {
                           <div className="bg-surface border border-border rounded-xl p-5 flex-1 shadow-sm">
                             <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Pipeline Status</h4>
                             <div className="space-y-3">
-                              {['Proxy Rotation Layer', 'Stream Parser', 'Dedup Engine', 'API Gateway'].map((q) => (
+                              {['Proxy Rotation Layer', 'Stream Parser', 'Dedup Engine', 'API Gateway'].map((q, i) => (
                                 <div key={q} className="flex items-center justify-between text-xs p-2 rounded bg-zinc-900 border border-zinc-800/50">
                                   <span className="font-mono text-zinc-400">{q}</span>
                                   <span className={cn(

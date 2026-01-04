@@ -26,7 +26,7 @@ const TIMEOUT_MS = 25000;
 export async function fetchWithSmartProxy(
   targetUrl: string, 
   options: RequestInit = {}, 
-  onLog?: (log: LogEntry) => void
+  _onLog?: (log: LogEntry) => void
 ): Promise<{ text: string; status: number; ok: boolean }> {
   let lastError: any;
 
