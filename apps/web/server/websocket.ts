@@ -1,4 +1,4 @@
-import { WebSocketServer, WebSocket as WsWebSocket } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { parse } from 'url';
 import { verifyToken } from './auth';
@@ -6,7 +6,7 @@ import { redis } from './redis';
 import { logger } from './logger';
 
 // ============ TYPES ============
-interface AuthenticatedWebSocket extends WsWebSocket {
+type AuthenticatedWebSocket = WebSocket & {
   userId?: string;
   organizationId?: string;
   projectId?: string;
@@ -45,7 +45,7 @@ export function createWebSocketServer(server: any): WebSocketServer {
     clearInterval(heartbeatInterval);
   });
   
-  wss.on('connection', async (ws: WsWebSocket, request: IncomingMessage) => {
+  wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
     const authenticatedWs = ws as AuthenticatedWebSocket;
     authenticatedWs.isAlive = true;
     
@@ -161,7 +161,7 @@ export function broadcastToProject(
   const messageStr = JSON.stringify(message);
   
   projectConnections.forEach((ws) => {
-    if (ws.readyState === WsWebSocket.OPEN) {
+    if (ws.readyState === WebSocket.OPEN) {
       ws.send(messageStr);
     }
   });
@@ -219,7 +219,7 @@ async function subscribeToRedis(): Promise<void> {
       
       if (projectConnections) {
         projectConnections.forEach((ws) => {
-          if (ws.readyState === WsWebSocket.OPEN) {
+          if (ws.readyState === WebSocket.OPEN) {
             ws.send(message);
           }
         });
