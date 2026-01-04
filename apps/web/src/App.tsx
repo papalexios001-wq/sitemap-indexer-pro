@@ -472,7 +472,7 @@ export default function App() {
                           <div className="bg-surface border border-border rounded-xl p-5 flex-1 shadow-sm">
                             <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Pipeline Status</h4>
                             <div className="space-y-3">
-                              {['Proxy Rotation Layer', 'Stream Parser', 'Dedup Engine', 'API Gateway'].map((q) => (
+                              {['Proxy Rotation Layer', 'Stream Parser', 'Dedup Engine', 'API Gateway'].map((q, i) => (
                                 <div key={q} className="flex items-center justify-between text-xs p-2 rounded bg-zinc-900 border border-zinc-800/50">
                                   <span className="font-mono text-zinc-400">{q}</span>
                                   <span className={cn(
