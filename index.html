@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sitemap Indexer Pro Enterprise</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+              background: '#09090b', // Zinc 950
+              surface: '#18181b', // Zinc 900
+              surfaceHighlight: '#27272a', // Zinc 800
+              border: '#27272a', // Zinc 800
+              brand: {
+                50: '#f0f9ff',
+                100: '#e0f2fe',
+                200: '#bae6fd',
+                300: '#7dd3fc',
+                400: '#38bdf8',
+                500: '#0ea5e9',
+                600: '#0284c7',
+                700: '#0369a1',
+                800: '#075985',
+                900: '#0c4a6e',
+                950: '#082f49',
+              },
+              accent: {
+                purple: '#8b5cf6',
+                success: '#10b981',
+                warning: '#f59e0b',
+                error: '#ef4444',
+              }
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.3s ease-out',
+              'slide-up': 'slideUp 0.4s ease-out',
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(10px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #09090b;
+        color: #e4e4e7; /* Zinc 200 */
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #27272a;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #3f3f46;
+      }
+
+      /* Utilities */
+      .glass-panel {
+        background: rgba(24, 24, 27, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      
+      .glass-modal {
+        background: rgba(9, 9, 11, 0.95);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Custom selection color */
+      ::selection {
+        background: rgba(14, 165, 233, 0.3);
+        color: #fff;
+      }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.11.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "clsx": "https://esm.sh/clsx@^2.1.0",
+    "tailwind-merge": "https://esm.sh/tailwind-merge@^2.2.0",
+    "drizzle-orm/": "https://esm.sh/drizzle-orm@^0.45.1/",
+    "drizzle-orm": "https://esm.sh/drizzle-orm@^0.45.1",
+    "@paralleldrive/cuid2": "https://esm.sh/@paralleldrive/cuid2@^3.0.6",
+    "zod": "https://esm.sh/zod@^4.3.4",
+    "@trpc/server": "https://esm.sh/@trpc/server@^11.8.1",
+    "crypto": "https://esm.sh/crypto@^1.0.1",
+    "bullmq": "https://esm.sh/bullmq@^5.66.4",
+    "stream/": "https://esm.sh/stream@^0.0.3/",
+    "zlib": "https://esm.sh/zlib@^1.0.5",
+    "stream": "https://esm.sh/stream@^0.0.3",
+    "sax": "https://esm.sh/sax@^1.4.3",
+    "p-retry": "https://esm.sh/p-retry@^7.1.1",
+    "p-limit": "https://esm.sh/p-limit@^7.2.0",
+    "googleapis": "https://esm.sh/googleapis@^169.0.0",
+    "@opentelemetry/resources": "https://esm.sh/@opentelemetry/resources@^2.2.0",
+    "@opentelemetry/semantic-conventions": "https://esm.sh/@opentelemetry/semantic-conventions@^1.38.0",
+    "pino": "https://esm.sh/pino@^10.1.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "https://esm.sh/@opentelemetry/exporter-metrics-otlp-http@^0.208.0",
+    "@opentelemetry/sdk-metrics": "https://esm.sh/@opentelemetry/sdk-metrics@^2.2.0",
+    "url": "https://esm.sh/url@^0.11.4",
+    "util": "https://esm.sh/util@^0.12.5",
+    "http": "https://esm.sh/http@^0.0.1-security",
+    "ws": "https://esm.sh/ws@^8.18.3"
+  }
+}
+</script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
