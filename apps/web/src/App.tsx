@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Terminal, Settings, Plus, Activity, Boxes, Database, ShieldCheck, ChevronRight, Command, Bell, Play, Pause, Square, Download, FileJson } from 'lucide-react';
-import { Project, LogEntry, JobStatus } from '../../types';
-import Dashboard from '../components/Dashboard';
-import LiveTerminal from '../components/LiveTerminal';
-import ProjectWizard from '../components/ProjectWizard';
-import { SitemapStreamer } from '../../services/sitemapStreamer';
-import { IndexingService } from '../../services/indexingService';
-import { PRISMA_SCHEMA } from '../../services/prismaSchema';
+import { LayoutDashboard, Terminal, Plus, Activity, Boxes, Database, ShieldCheck, ChevronRight, Command, Play, Pause, Square, Download } from 'lucide-react';
+import { Project, LogEntry, JobStatus } from './types';
+import Dashboard from './components/Dashboard';
+import LiveTerminal from './components/LiveTerminal';
+import ProjectWizard from './components/ProjectWizard';
+import { SitemapStreamer } from './services/sitemapStreamer';
+import { IndexingService } from './services/indexingService';
+import { PRISMA_SCHEMA } from './services/prismaSchema';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -152,7 +152,7 @@ export default function App() {
 
     addLog({ id: 'init', timestamp: new Date(), level: 'info', message: `🚀 STARTING JOB: ${project.domain}`, module: 'WORKER' });
 
-    const streamer = new SitemapStreamer(addLog, (count) => updateProjectStats(projectId, { totalUrls: count }), signal);
+    const streamer = new SitemapStreamer(addLog, (count: number) => updateProjectStats(projectId, { totalUrls: count }), signal);
     const indexer = new IndexingService(addLog);
     
     try {
@@ -457,7 +457,7 @@ export default function App() {
                           <div className="bg-surface border border-border rounded-xl p-5 flex-1 shadow-sm">
                             <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Pipeline Status</h4>
                             <div className="space-y-3">
-                              {['Proxy Rotation Layer', 'Stream Parser', 'Dedup Engine', 'API Gateway'].map((q, i) => (
+                              {['Proxy Rotation Layer', 'Stream Parser', 'Dedup Engine', 'API Gateway'].map((q) => (
                                 <div key={q} className="flex items-center justify-between text-xs p-2 rounded bg-zinc-900 border border-zinc-800/50">
                                   <span className="font-mono text-zinc-400">{q}</span>
                                   <span className={cn(
