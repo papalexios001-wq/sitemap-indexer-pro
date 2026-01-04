@@ -9,7 +9,6 @@ interface LiveTerminalProps {
 }
 
 const LiveTerminal: React.FC<LiveTerminalProps> = ({ logs, isRunning }) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom whenever logs change
