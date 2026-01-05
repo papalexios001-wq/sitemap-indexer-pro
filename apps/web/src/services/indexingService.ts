@@ -144,9 +144,13 @@ export class IndexingService {
           if (res.ok) {
             return { success: true };
           } else {
-            // CRITICAL ERROR HANDLING
-            if (res.status === 403) return { success: false, fatal: true, msg: '403 Forbidden (Verify GSC Owner)' };
-            if (res.status === 429) return { success: false, fatal: true, msg: '429 Quota Exceeded (200/Day Limit Reached)' };
+            // CRITICAL ERROR HANDLING - EXPLICIT MESSAGING
+            if (res.status === 403) {
+                return { success: false, fatal: true, msg: 'PERMISSION DENIED: Add Service Account Email to GSC Users.' };
+            }
+            if (res.status === 429) {
+                return { success: false, fatal: true, msg: 'QUOTA EXCEEDED: You hit the 200/day limit.' };
+            }
             return { success: false, msg: `HTTP ${res.status}` };
           }
         } catch (e: any) {

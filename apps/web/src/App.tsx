@@ -246,8 +246,55 @@ export default function App() {
               appendChartData(batch.length, res.submitted);
               
               if (res.abort) {
-                  addLog({ id: 'g_abort', timestamp: new Date(), level: 'error', message: 'Google Abort Triggered (Quota/Perms)', module: 'API' });
-                  break;
+                  // Enhanced Error Handling
+                  const uniqueErrors = Array.from(new Set(res.errorDetails));
+                  
+                  uniqueErrors.forEach(err => {
+                       addLog({ id: `g_err_${Date.now()}_${Math.random()}`, timestamp: new Date(), level: 'error', message: `❌ ${err}`, module: 'API' });
+                  });
+
+                  // Context-aware advice
+                  const isPermError = uniqueErrors.some(e => e.includes('PERMISSION') || e.includes('403'));
+                  if (isPermError) {
+                      const saEmail = (project as any).serviceAccountEmail || "the Service Account Email";
+                      addLog({ 
+                          id: `g_fix_header_${Date.now()}`, 
+                          timestamp: new Date(), 
+                          level: 'warn', 
+                          message: '👉 GOOGLE PERMISSION ERROR DETECTED', 
+                          module: 'API' 
+                      });
+                      addLog({ 
+                          id: `g_fix_step1_${Date.now()}`, 
+                          timestamp: new Date(), 
+                          level: 'info', 
+                          message: `1. Go to Google Search Console for ${project.domain}`, 
+                          module: 'API' 
+                      });
+                       addLog({ 
+                          id: `g_fix_step2_${Date.now()}`, 
+                          timestamp: new Date(), 
+                          level: 'info', 
+                          message: `2. Navigate to Settings > Users and permissions`, 
+                          module: 'API' 
+                      });
+                      addLog({ 
+                          id: `g_fix_step3_${Date.now()}`, 
+                          timestamp: new Date(), 
+                          level: 'warn', 
+                          message: `3. ADD USER: ${saEmail}`, 
+                          module: 'API' 
+                      });
+                       addLog({ 
+                          id: `g_fix_step4_${Date.now()}`, 
+                          timestamp: new Date(), 
+                          level: 'warn', 
+                          message: `4. SET ROLE: "Owner" (Full is not enough)`, 
+                          module: 'API' 
+                      });
+                  }
+
+                  break; // Stop processing loop
               }
           }
       }
@@ -258,7 +305,12 @@ export default function App() {
 
     } catch (e: any) {
       if (e.name === 'AbortError') {
-         addLog({ id: 'aborted', timestamp: new Date(), level: 'warn', message: '⚠ Job Aborted by User.', module: 'WORKER' });
+         // ONLY say "Aborted by User" if the abort signal was actually triggered by the user button
+         if (signal.aborted) {
+             addLog({ id: 'aborted', timestamp: new Date(), level: 'warn', message: '⚠ Job Aborted by User.', module: 'WORKER' });
+         } else {
+             addLog({ id: 'timeout', timestamp: new Date(), level: 'error', message: '❌ Connection Timed Out (Network Error). Try again.', module: 'WORKER' });
+         }
       } else {
          addLog({ id: 'err', timestamp: new Date(), level: 'error', message: `FAILURE: ${e.message}`, module: 'WORKER' });
       }
