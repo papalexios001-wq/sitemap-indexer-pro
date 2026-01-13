@@ -1,30 +1,36 @@
 import { LogEntry } from "../types";
 
-// 🛡️ ENTERPRISE PROXY LAYER v5.0
-// robust-rotation | post-support | timeout-handling | abort-support
+// 🛡️ ENTERPRISE PROXY LAYER v5.2
+// Prioritize CodeTabs for POST stability
 
 const PROXY_STRATEGIES = [
-  // Strategy A: CorsProxy.io (Fast, usually supports POST)
-  { 
-    name: 'CorsProxy.io', 
-    supportsBody: true,
-    fn: (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}` 
-  },
-  // Strategy B: CodeTabs (Reliable for POST)
+  // Strategy A: CodeTabs (Most reliable for POST data/JSON)
   {
     name: 'CodeTabs',
     supportsBody: true,
     fn: (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
   },
-  // Strategy C: AllOrigins (GET only usually, fallback)
+  // Strategy B: CorsProxy.io (Fast, but sometimes strict on headers)
+  { 
+    name: 'CorsProxy.io', 
+    supportsBody: true,
+    fn: (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}` 
+  },
+  // Strategy C: ThingProxy (Fallback)
+  {
+    name: 'ThingProxy',
+    supportsBody: true,
+    fn: (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`
+  },
+  // Strategy D: AllOrigins (GET only, last resort)
   { 
     name: 'AllOrigins', 
-    supportsBody: false, // AllOrigins often fails with POST bodies
+    supportsBody: false,
     fn: (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` 
   }
 ];
 
-const TIMEOUT_MS = 30000; // Increased to 30s
+const TIMEOUT_MS = 30000;
 
 export async function fetchWithSmartProxy(
   targetUrl: string, 
@@ -34,40 +40,9 @@ export async function fetchWithSmartProxy(
   let lastError: any;
   const isBodyRequest = options.method === 'POST' || options.method === 'PUT';
 
-  // 1. DIRECT ATTEMPT (Standard Browser Fetch)
-  try {
-    const controller = new AbortController();
-    // Link external signal to this controller
-    if (options.signal) {
-        options.signal.addEventListener('abort', () => controller.abort());
-    }
-
-    // Set timeout
-    const timeoutId = setTimeout(() => controller.abort('TIMEOUT'), TIMEOUT_MS);
-    
-    const response = await fetch(targetUrl, { ...options, signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    // If direct fetch works (status is not 0), return it. 
-    if (response.status !== 0) {
-      const text = await response.text();
-      return { text, status: response.status, ok: response.ok };
-    }
-  } catch (e: any) {
-    // If it was a timeout, throw specific error so App.tsx knows it wasn't the user
-    if (e === 'TIMEOUT' || (e.name === 'AbortError' && !options.signal?.aborted)) {
-        // Fallthrough to proxies instead of crashing immediately on timeout
-    } else if (e.name === 'AbortError') {
-        throw e; // Real user abort
-    }
-  }
-
-  // 2. PROXY ROTATION
+  // 1. PROXY ROTATION
   for (const strategy of PROXY_STRATEGIES) {
-    // Skip proxies that don't support bodies if we are sending data
     if (isBodyRequest && !strategy.supportsBody) continue;
-    
-    // Check abort before trying next proxy
     if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
     try {
@@ -78,6 +53,7 @@ export async function fetchWithSmartProxy(
          options.signal.addEventListener('abort', () => controller.abort());
       }
       
+      // Proxies can be slow, give them time
       const timeoutId = setTimeout(() => controller.abort('TIMEOUT'), TIMEOUT_MS);
 
       const response = await fetch(proxyUrl, { 
@@ -87,23 +63,43 @@ export async function fetchWithSmartProxy(
       
       clearTimeout(timeoutId);
 
-      // If proxy returns 429 (Rate Limit) or 403 (Forbidden by proxy), try next
-      if (response.status === 429 || (response.status === 403 && !response.headers.get('x-google-original-status'))) {
+      // VALIDATION: Many proxies return 200 OK even if they failed internally, 
+      // but send back HTML (like "Status: 403 Forbidden" text). 
+      // We are expecting JSON or XML mostly.
+      const contentType = response.headers.get('content-type');
+      const text = await response.text();
+
+      // If we got a 429 or 403 from the PROXY itself (often indicated by specific headers or small HTML bodies)
+      // we should skip to the next proxy.
+      const isProxyError = response.status === 429 || 
+                          (response.status === 403 && !text.includes('google') && !text.includes('IndexNow')) ||
+                          (response.status === 500 && text.includes('proxy'));
+
+      if (isProxyError) {
+          // console.warn(`Proxy ${strategy.name} failed: ${response.status}`);
           continue; 
       }
       
-      const text = await response.text();
       return { text, status: response.status, ok: response.ok };
 
     } catch (e: any) {
       if (e.name === 'AbortError' && options.signal?.aborted) throw e;
-      if (e === 'TIMEOUT' || (e.name === 'AbortError' && !options.signal?.aborted)) {
-         lastError = new Error("Network Timeout");
-      } else {
-         lastError = e;
-      }
+      lastError = e;
+      // Small delay before next proxy to let network settle
+      await new Promise(r => setTimeout(r, 200));
     }
   }
 
-  throw lastError || new Error(`Network/CORS Error: Could not reach ${targetUrl}.`);
+  // 2. LAST RESORT: DIRECT ATTEMPT
+  // (Only works if the API supports CORS, unlikely for Indexing API but possible for others)
+  try {
+     if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+     const response = await fetch(targetUrl, options);
+     const text = await response.text();
+     return { text, status: response.status, ok: response.ok };
+  } catch (e) {
+     // Ignore direct failure if proxies already failed
+  }
+
+  throw lastError || new Error(`Network Error: Unable to reach ${targetUrl} via any proxy.`);
 }

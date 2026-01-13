@@ -114,12 +114,12 @@ export class IndexingService {
     }
   }
 
-  // ⚡ GOOGLE: Throttle requests + CIRCUIT BREAKER
+  // ⚡ GOOGLE: Intelligent Retry Logic
   async submitGoogleUrls(accessToken: string, urls: string[], signal?: AbortSignal): Promise<{ submitted: number, errors: number, errorDetails: string[], abort?: boolean }> {
     let submitted = 0;
     let errors = 0;
     const errorDetails: string[] = [];
-    const CHUNK_SIZE = 5;
+    const CHUNK_SIZE = 1; 
     
     for (let i = 0; i < urls.length; i += CHUNK_SIZE) {
       if (signal?.aborted) throw new DOMException('Job Aborted', 'AbortError');
@@ -127,36 +127,75 @@ export class IndexingService {
       const chunk = urls.slice(i, i + CHUNK_SIZE);
       
       const promises = chunk.map(async (url) => {
-        try {
-          const res = await fetchWithSmartProxy(
-            "https://indexing.googleapis.com/v3/urlNotifications:publish",
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ url: url, type: "URL_UPDATED" }),
-              signal
-            }
-          );
+        let retries = 4; // Increased retries
+        let backoff = 2000;
+        
+        while (retries > 0) {
+            if (signal?.aborted) throw new DOMException('Job Aborted', 'AbortError');
 
-          if (res.ok) {
-            return { success: true };
-          } else {
-            // CRITICAL ERROR HANDLING - EXPLICIT MESSAGING
-            if (res.status === 403) {
-                return { success: false, fatal: true, msg: 'PERMISSION DENIED: Add Service Account Email to GSC Users.' };
+            try {
+                const res = await fetchWithSmartProxy(
+                    "https://indexing.googleapis.com/v3/urlNotifications:publish",
+                    {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url, type: "URL_UPDATED" }),
+                    signal
+                    }
+                );
+
+                if (res.ok) {
+                    return { success: true };
+                } else {
+                    // PARSE ACTUAL ERROR
+                    let errorMsg = res.text;
+                    try {
+                        const json = JSON.parse(res.text);
+                        errorMsg = json.error?.message || res.text;
+                    } catch (e) {}
+                    
+                    if (res.status === 429) {
+                        // CHECK IF REAL QUOTA
+                        if (errorMsg.toLowerCase().includes('quota')) {
+                             return { success: false, fatal: true, msg: 'QUOTA EXCEEDED: Google says "Quota Exceeded".' };
+                        }
+                        
+                        // Otherwise it's just a rate limit
+                        if (retries > 1) {
+                            this.log('warn', `Rate Limited (429). Retrying in ${backoff/1000}s...`);
+                            await new Promise(resolve => setTimeout(resolve, backoff));
+                            backoff *= 1.5; // Exponential backoff
+                            retries--;
+                            continue;
+                        } else {
+                            return { success: false, msg: 'Rate Limit (Max Retries)' };
+                        }
+                    }
+
+                    if (res.status === 403) {
+                         // Check specific 403 reason
+                         if (errorMsg.includes('permission') || errorMsg.includes('ownership')) {
+                             return { success: false, fatal: true, msg: 'PERMISSION DENIED: Service Account not Owner in GSC.' };
+                         }
+                         return { success: false, msg: `403 Forbidden: ${errorMsg.substring(0, 50)}` };
+                    }
+                    
+                    return { success: false, msg: `HTTP ${res.status}: ${errorMsg.substring(0, 30)}` };
+                }
+            } catch (e: any) {
+                if (e.name === 'AbortError') throw e;
+                if (retries > 1) {
+                    await new Promise(r => setTimeout(r, backoff));
+                    retries--;
+                    continue;
+                }
+                return { success: false, msg: 'Network Error' };
             }
-            if (res.status === 429) {
-                return { success: false, fatal: true, msg: 'QUOTA EXCEEDED: You hit the 200/day limit.' };
-            }
-            return { success: false, msg: `HTTP ${res.status}` };
-          }
-        } catch (e: any) {
-          if (e.name === 'AbortError') throw e;
-          return { success: false, msg: e.message || 'Network Error' };
         }
+        return { success: false, msg: 'Max Retries Exceeded' };
       });
 
       const results = await Promise.all(promises);
@@ -177,14 +216,14 @@ export class IndexingService {
       }
 
       if (i + CHUNK_SIZE < urls.length) {
-          await new Promise(r => setTimeout(r, 600)); // Increased throttle
+          await new Promise(r => setTimeout(r, 1500)); 
       }
     }
 
     return { submitted, errors, errorDetails };
   }
 
-  // 🚀 INDEXNOW: Adaptive Batch Splitting
+  // 🚀 INDEXNOW
   async submitIndexNowBulk(host: string, key: string, urls: string[], signal?: AbortSignal): Promise<{ submitted: number, errors: number }> {
      return this.attemptIndexNowBatch(host, key, urls, signal);
   }
@@ -199,45 +238,46 @@ export class IndexingService {
         keyLocation: `https://${host}/${key}.txt`
     };
 
-    try {
-        const res = await fetchWithSmartProxy(
-            "https://api.indexnow.org/indexnow",
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=utf-8' },
-                body: JSON.stringify(body),
-                signal
+    let retries = 2;
+    while(retries >= 0) {
+        try {
+            const res = await fetchWithSmartProxy(
+                "https://api.indexnow.org/indexnow",
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: JSON.stringify(body),
+                    signal
+                }
+            );
+
+            if (res.ok || res.status === 200 || res.status === 202) {
+                this.log('success', `✔ IndexNow accepted batch of ${urls.length} URLs.`);
+                return { submitted: urls.length, errors: 0 };
+            } 
+            
+            // If it's a server/rate error, retry
+            if (res.status >= 500 || res.status === 429) {
+                throw new Error(`HTTP ${res.status}`);
             }
-        );
+            
+            // If it's a client error (400, 422), stop retrying this batch
+            this.log('error', `IndexNow Rejected (${res.status}): ${res.text.substring(0, 100)}`);
+            return { submitted: 0, errors: urls.length };
 
-        if (res.ok || res.status === 200 || res.status === 202) {
-            this.log('success', `✔ IndexNow accepted batch of ${urls.length} URLs.`);
-            return { submitted: urls.length, errors: 0 };
-        } 
-        
-        // IF RATE LIMITED (429) OR UNPROCESSABLE (422), TRY SPLITTING
-        if ((res.status === 429 || res.status === 422) && urls.length > 10) {
-            this.log('warn', `IndexNow ${res.status} on batch of ${urls.length}. Splitting batch...`);
+        } catch (e: any) {
+            if (e.name === 'AbortError') throw e;
             
-            const mid = Math.floor(urls.length / 2);
-            const left = urls.slice(0, mid);
-            const right = urls.slice(mid);
-            
-            await new Promise(r => setTimeout(r, 1000)); // Cool down
-            
-            const r1 = await this.attemptIndexNowBatch(host, key, left, signal);
-            const r2 = await this.attemptIndexNowBatch(host, key, right, signal);
-            
-            return { submitted: r1.submitted + r2.submitted, errors: r1.errors + r2.errors };
+            if (retries > 0) {
+                 this.log('warn', `IndexNow Connection Error. Retrying... (${retries} left)`);
+                 await new Promise(r => setTimeout(r, 3000));
+                 retries--;
+            } else {
+                 this.log('error', `IndexNow Failed after retries: ${e.message}`);
+                 return { submitted: 0, errors: urls.length };
+            }
         }
-
-        this.log('error', `IndexNow Failed (${res.status}): ${res.text.substring(0, 100)}`);
-        return { submitted: 0, errors: urls.length };
-
-    } catch (e: any) {
-        if (e.name === 'AbortError') throw e;
-        this.log('error', `IndexNow Network Error: ${e.message}`);
-        return { submitted: 0, errors: urls.length };
     }
+    return { submitted: 0, errors: urls.length };
   }
 }
